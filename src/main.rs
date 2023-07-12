@@ -1,4 +1,6 @@
+use std::fs::read_to_string;
 use std::{path::Path, rc::Rc, cell::RefCell};
+use std::env;
 use home::home_dir;
 use interpreter::{Environment, eval};
 use rustyline::{Editor, history::DefaultHistory, validate::Validator, hint::{Hinter, HistoryHinter}, Context, highlight::Highlighter, Helper, completion::{Completer, Pair}, error::ReadlineError, config::Configurer};
@@ -49,6 +51,21 @@ impl Hinter for CustomHelper {
 type CustomEditor = Editor<CustomHelper, DefaultHistory>;
 
 fn main() {
+    let envb = Rc::new(RefCell::new(Environment::new()));
+
+    let args: Vec<_> = env::args().collect();
+    if args.len() > 1 {
+        let file = args[1].clone();
+        let input = read_to_string(file).unwrap();
+
+        let lex = Lexer::new(input);
+        let mut parser = Parser::new(lex);
+        let root = parser.parse();
+
+        println!("Rezultat: {}", eval(root, Some(Rc::clone(&envb))).unwrap());
+        return;
+    }
+
     let mut rl_hist = home_dir().unwrap();
     rl_hist.push(Path::new(".rolang_history"));
     let rl_hist = rl_hist.to_str().unwrap();
@@ -60,8 +77,6 @@ fn main() {
 
     rl.set_helper(Some(CustomHelper { hinter: HistoryHinter {  }}));
     rl.set_completion_type(rustyline::CompletionType::Circular);
-
-    let envb = Rc::new(RefCell::new(Environment::new()));
 
     loop {
         let readline = rl.readline("> ");
