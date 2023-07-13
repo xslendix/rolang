@@ -223,6 +223,7 @@ impl Lexer {
                     Token::LessThan
                 }
             },
+            '←' | '🡐' | '🠐' | '🠔' | '⭠' | '🠀' | '🠠' | '🡠' | '🡨' | '' => Token::Set,
             '>' => {
                 if self.peek() == '=' {
                     self.read_char();
@@ -312,16 +313,34 @@ impl Lexer {
 
     fn read_ident(&mut self) -> String {
         let pos = self.pos;
-        while is_valid_romanian_character(self.ch) || self.ch == '_' || 
-            (self.ch == ' ' && (self.peek() == 'c' || self.peek() == 't'))
-        {
+        while is_valid_romanian_character(self.ch) || self.ch == '_' {
             self.read_char()
         }
-        self.input.chars().skip(pos).take(self.pos - pos).collect()
+        let mut lol = self.input.chars().skip(pos).take(self.pos - pos).collect::<String>();
+        match lol.as_str() {
+            "până" | "pâna" | "pană" | "pana" => {
+                self.skip_whitespace();
+                let cand = self.read_ident();
+                if matches!(cand.as_str(), "cand" | "când") {
+                    lol.push(' ');
+                    lol.push_str(cand.as_ref());
+                }
+            }
+            "cat" | "cât" => {
+                self.skip_whitespace();
+                let timp = self.read_ident();
+                if timp == "timp" {
+                    lol.push(' ');
+                    lol.push_str(timp.as_ref());
+                }
+            }
+            _ => ()
+        }
+        lol
     }
 
     fn skip_whitespace(&mut self) {
-        while self.ch.is_whitespace() || matches!(self.ch, '│' | '└' | '┌') {
+        while self.ch.is_whitespace() || matches!(self.ch, '│' | '└' | '┌' | ';') {
             self.read_char();
         }
     }

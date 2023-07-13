@@ -61,6 +61,7 @@ fn main() {
         let lex = Lexer::new(input);
         let mut parser = Parser::new(lex);
         let root = parser.parse();
+        root.print(String::new(), true);
 
         println!("Rezultat: {}", eval(root, Some(Rc::clone(&envb))).unwrap());
         return;

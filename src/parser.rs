@@ -281,6 +281,11 @@ impl Parser {
             let ret = self.math_expr();
             self.expect(Token::RParen);
             ret
+        } else if self.accept(Token::FloorStart) {
+            let mut node = ASTNode::from(ASTNodeValue::Floor);
+            node.children.push(self.math_expr());
+            self.expect(Token::FloorEnd);
+            Box::new(node)
         } else {
             self.errors.push(format!("Illegal token: {}", self.c));
             self.next();
@@ -291,7 +296,7 @@ impl Parser {
     fn term(&mut self) -> Box<ASTNode> {
         let mut node: Box<ASTNode>;
         if self.is(Token::Subtract) || self.is(Token::Not) {
-            node = Box::new(ASTNode::from_token(self.c.clone()));
+            node = Box::new(ASTNode::from_token(self.next_prev()));
             node.children.push(self.term());
             return node;
         } else {
@@ -314,13 +319,6 @@ impl Parser {
     }
 
     fn math_expr(&mut self) -> Box<ASTNode> {
-        if self.accept(Token::FloorStart) {
-            let mut node = ASTNode::from(ASTNodeValue::Floor);
-            node.children.push(self.math_expr());
-            self.expect(Token::FloorEnd);
-            return Box::new(node);
-        }
-
         let mut node = self.term();
         while matches!(self.c, Token::Add | Token::Subtract) {
             let mut new = ASTNode::from_token(self.next_prev());

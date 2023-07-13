@@ -281,7 +281,18 @@ pub fn eval<'a>(root: Box<ASTNode>, parent: Option<Rc<RefCell<Environment>>>) ->
         ASTNodeValue::GreaterThan => perform_logical_operation!(root.children[0], root.children[1], envb.clone(), >),
         ASTNodeValue::GreaterThanEqual => perform_logical_operation!(root.children[0], root.children[1], envb.clone(), >=),
         ASTNodeValue::Add => perform_operation!(root.children[0], root.children[1], envb.clone(), +),
-        ASTNodeValue::Subtract => perform_operation!(root.children[0], root.children[1], envb.clone(), -),
+        ASTNodeValue::Subtract => {
+            if root.children.len() == 1 {
+                match eval(root.children[0].clone(), Some(envb.clone()))? {
+                    Object::Int(x) => Ok(Object::Int(-x)),
+                    Object::Float(x) => Ok(Object::Float(-x)),
+                    Object::Bool(x) => Ok(Object::Bool(!x)),
+                    Object::Null => Ok(Object::Null),
+                }
+            } else {
+                perform_operation!(root.children[0], root.children[1], envb.clone(), -)
+            }
+        }
         ASTNodeValue::Multiply => perform_operation_term!(root.children[0], root.children[1], envb.clone(), *),
         ASTNodeValue::Divide => {
             if root.children[1].value == ASTNodeValue::Null {
