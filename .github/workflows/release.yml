@@ -1,0 +1,32 @@
+name: Build and Release
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Install Mingw
+      run: sudo apt-get install -y gcc-mingw-w64
+    - name: build-musl linux x86_64
+      uses: shogan/rust-musl-action@master
+      with:
+        args: cargo build --target x86_64-unknown-linux-musl --release
+
+    - name: build-musl windows x86_64
+      uses: shogan/rust-musl-action@master
+      with:
+        args: cargo build --target x86_64-pc-windows-gnu --release
+
+
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: Release Binaries
+        path: |
+          target/x86_64-pc-windows-gnu/release/
+          target/x86_64-unknown-linux-gnu/release/
+      if: startsWith(github.event.action, 'build-rust')
