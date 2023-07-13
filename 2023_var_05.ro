@@ -1,0 +1,14 @@
+x<-6907512
+p<-1; m←-1
+┌cât timp p≤x execută
+│ c<-[x/p]%10
+│┌dacă c>m atunci
+││ m<-c; p<-p*10
+││altfel
+││ x<-[x/(p*10)]*p+x%p
+│└■
+└■
+┌dacă m≥0 atunci x
+│ altfel nul
+└■
+
