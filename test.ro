@@ -1,0 +1,8 @@
+a<-0
+pentru i<-1, 20, 2 execută
+  scrie 'i: ', i, '\n'
+	a<-a+i
+[]
+len <- scrie('a: ', a, '\n')
+scrie 'len: ', len, '\n'
+
