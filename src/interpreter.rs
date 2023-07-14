@@ -21,7 +21,7 @@ impl Display for Object {
                 true => "adevărat",
                 false => "fals",
             }),
-            Object::Null => write!(f, "Nul"),
+            Object::Null => write!(f, "nul"),
             Object::String(x) => write!(f, "{}", x),
         }
     }
@@ -39,6 +39,9 @@ impl Environment {
     }
 
     pub fn find_variable(&mut self, key: &str, value: Option<Box<Object>>) -> Option<Box<Object>> {
+        if matches!(key, "scrie" | "citește") {
+            return None;
+        }
         if let Some(obj) = self.syms.get(key) {
             if let Some(val) = value {
                 self.syms.remove(key);
@@ -73,7 +76,7 @@ macro_rules! perform_operation {
                         true => 1.0,
                         false => 0.0,
                     }),
-                    Object::String(_) => Object::Null,
+                    Object::String(x) => Object::String(leftv.to_string() + x.as_str()),
                     Object::Null => left,
                 },
                 Object::Int(leftv) => match right {
@@ -83,7 +86,7 @@ macro_rules! perform_operation {
                         true => 1,
                         false => 0,
                     }),
-                    Object::String(_) => Object::Null,
+                    Object::String(x) => Object::String(leftv.to_string() + x.as_str()),
                     Object::Null => left,
                 },
                 Object::Bool(leftv) => match right {
@@ -102,7 +105,10 @@ macro_rules! perform_operation {
                         true => 1,
                         false => 0,
                     }),
-                    Object::String(_) => Object::Null,
+                    Object::String(x) => Object::String(match leftv {
+                        true => String::from("adevărat"),
+                        false => String::from("fals"),
+                    } + x.as_str()),
                     Object::Null => left,
                 },
                 Object::String(leftv) => match right {
@@ -113,7 +119,7 @@ macro_rules! perform_operation {
                         false => "fals",
                     }),
                     Object::String(right) => Object::String(leftv + &right.to_string()),
-                    Object::Null => Object::String(leftv + "Nul"),
+                    Object::Null => Object::String(leftv + "nul"),
                 },
                 Object::Null => left,
             };
@@ -177,7 +183,16 @@ macro_rules! perform_operation_term {
                     Object::String(_) => Object::Null,
                     Object::Null => left,
                 },
-                Object::String(_) => Object::Null,
+                Object::String(x) => Object::String(x.repeat(match right {
+                    Object::Int(j) => j as usize,
+                    Object::Float(j) => j as usize,
+                    Object::Bool(j) => match j {
+                        true => 1,
+                        false => 0,
+                    },
+                    Object::String(_) => 0,
+                    Object::Null => 0,
+                })),
                 Object::Null => left,
             };
             Ok(ret)
@@ -367,13 +382,30 @@ pub fn eval<'a>(root: Box<ASTNode>, parent: Option<Rc<RefCell<Environment>>>) ->
             Ok(Object::Bool(truthy(eval(root.children[0].clone(), Some(envb.clone()))?) || truthy(eval(root.children[0].clone(), Some(envb.clone()))?)))
         }
         ASTNodeValue::FunctionCall(name) => {
-            if name == "scrie" {
-                for node in root.children {
-                    print!("{}", eval(node.clone(), Some(envb.clone()))?);
-                    std::io::stdout().flush()?;
+            let lol = &envb.borrow_mut().find_variable(name.as_str(), None);
+            match lol {
+                None => {
+                    if name == "scrie" {
+                        let mut written = 0;
+                        for node in root.children {
+                            let res = eval(node.clone(), Some(envb.clone()))?;
+                            written += res.to_string().chars().count();
+                            print!("{}", res);
+                            std::io::stdout().flush()?;
+                        }
+                        Ok(Object::Int(written as i64))
+                    } else {
+                        Ok(Object::Null)
+                    }
+                }
+                Some(x) => {
+                    if root.children.len() > 0 {
+                        unimplemented!("Nu sunt implementate funcțiile user-defined.")
+                    } else {
+                        Ok(*x.clone())
+                    }
                 }
             }
-            Ok(Object::Null)
         },
         ASTNodeValue::Illegal => {
             todo!("Unimplemented: {}", root.value)

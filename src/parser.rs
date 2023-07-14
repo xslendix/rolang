@@ -245,6 +245,10 @@ impl Parser {
         mem::discriminant(&ttype) == mem::discriminant(&self.c)
     }
 
+    fn pis(&mut self, ttype: Token) -> bool {
+        mem::discriminant(&ttype) == mem::discriminant(&self.n)
+    }
+
     fn accept(&mut self, ttype: Token, skip_scolon: bool) -> bool {
         if self.is(ttype) {
             self.next(skip_scolon);
@@ -501,7 +505,7 @@ impl Parser {
     fn prog(&mut self, in_block: bool, in_if: bool, in_execute: bool) -> Box<ASTNode> {
         let mut prog = Box::new(ASTNode::from(ASTNodeValue::Program));
         while self.c != Token::EOF && !(in_if && self.is(Token::Else)) && !(matches!(self.c, Token::While | Token::For | Token::Until) && in_execute) {
-            let stmt = if self.is(Token::Identifier(String::new())) && self.n != Token::Set && self.n != Token::LParen {
+            let stmt = if self.is(Token::Identifier(String::new())) && (self.pis(Token::Identifier(String::new())) || self.pis(Token::Int(0)) || self.pis(Token::Float(0.0)) || self.pis(Token::String(String::new())) || self.pis(Token::True) || self.pis(Token::False) || self.pis(Token::Null)) {
                 self.function_call(true)
             } else {
                 self.stmt()
