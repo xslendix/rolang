@@ -8,7 +8,7 @@ p<-1; m←-1
 ││ x<-[x/(p*10)]*p+x%p
 │└■
 └■
-┌dacă m≥0 atunci x
-│ altfel nul
+┌dacă m≥0 atunci scrie x
+│ altfel scrie "nul"
 └■
 
