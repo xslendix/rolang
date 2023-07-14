@@ -8,6 +8,7 @@ pub enum ASTNodeValue {
     Identifier(String),
     Int(i64),
     Float(f64),
+    String(String),
     Bool(bool),
     Null,
     Program,
@@ -56,6 +57,7 @@ impl ASTNode {
                 Token::Identifier(x) => ASTNodeValue::Identifier(x),
                 Token::Int(x) => ASTNodeValue::Int(x),
                 Token::Float(x) => ASTNodeValue::Float(x),
+                Token::String(x) => ASTNodeValue::String(x),
                 Token::True => ASTNodeValue::Bool(true),
                 Token::False => ASTNodeValue::Bool(false),
                 Token::Null => ASTNodeValue::Null,
@@ -112,6 +114,7 @@ impl ASTNode {
             ASTNodeValue::Identifier(x) => format!("Identifier \x1b[40G{}", x),
             ASTNodeValue::Int(x) => format!("Int \x1b[40G{}", x),
             ASTNodeValue::Float(x) => format!("Float \x1b[40G{}", x),
+            ASTNodeValue::String(x) => format!("String \x1b[40G{}", x),
             ASTNodeValue::Bool(x) => format!("Bool \x1b[40G{}", x),
             ASTNodeValue::Null => "Null".to_string(),
             ASTNodeValue::Program => "Program".to_string(),
@@ -160,6 +163,7 @@ impl Display for ASTNodeValue {
             ASTNodeValue::Identifier(x) => write!(f, "Identifier({})", x),
             ASTNodeValue::Int(x) => write!(f, "Int({})", x),
             ASTNodeValue::Float(x) => write!(f, "Float({})", x),
+            ASTNodeValue::String(x) => write!(f, "String({})", x),
             ASTNodeValue::Bool(x) => write!(f, "Bool({})", x),
             ASTNodeValue::Null => write!(f, "Null"),
             ASTNodeValue::Program => write!(f, "Program"),
@@ -213,23 +217,27 @@ impl Parser {
             errors: Vec::new()
         };
 
-        parser.next();
-        parser.next();
+        parser.next(false);
+        parser.next(false);
 
         parser
     }
 
-    fn next(&mut self) {
+    fn next(&mut self, skip_scolon: bool) {
         self.c = self.n.clone();
         self.n = self.lexer.next().unwrap_or_else(|err| {
             self.errors.push(err.to_string());
             Token::Illegal
         });
+
+        if self.c == Token::SColon && skip_scolon {
+            self.next(true)
+        }
     }
 
-    fn next_prev(&mut self) -> Token {
+    fn next_prev(&mut self, skip_scolon: bool) -> Token {
         let old = self.c.clone();
-        self.next();
+        self.next(skip_scolon);
         old
     }
 
@@ -237,58 +245,70 @@ impl Parser {
         mem::discriminant(&ttype) == mem::discriminant(&self.c)
     }
 
-    fn accept(&mut self, ttype: Token) -> bool {
+    fn accept(&mut self, ttype: Token, skip_scolon: bool) -> bool {
         if self.is(ttype) {
-            self.next();
+            self.next(skip_scolon);
             true
         } else {
             false
         }
     }
 
-    fn expect(&mut self, ttype: Token) -> bool {
-        if self.accept(ttype.clone()) {
+    fn expect(&mut self, ttype: Token, skip_scolon: bool) -> bool {
+        if self.accept(ttype.clone(), skip_scolon) {
             return true;
         }
         self.errors.push(format!("Expected {}, got {}", ttype, self.c).to_string());
+        println!("{}", format!("Expected {}, got {}", ttype, self.c).to_string());
         false
     }
 
-    fn function_call(&mut self) -> Box<ASTNode> {
-        let mut node = ASTNode::from(ASTNodeValue::FunctionCall(match &self.next_prev() {
+    fn function_call(&mut self, in_prog: bool) -> Box<ASTNode> {
+        let mut node = ASTNode::from(ASTNodeValue::FunctionCall(match &self.next_prev(true) {
             Token::Identifier(x) => x.to_string(),
             _ => unreachable!()
         }));
-        self.expect(Token::LParen);
-        while !self.is(Token::RParen) {
-            node.children.push(self.expr());
-            if !self.is(Token::RParen) {
-                self.expect(Token::Comma);
+        if in_prog {
+            while !self.is(Token::SColon) && !self.is(Token::EOF) {
+                node.children.push(self.expr());
+                if !self.is(Token::SColon) && !self.is(Token::EOF) {
+                    self.expect(Token::Comma, true);
+                }
             }
+            self.next(false);
+        } else {
+            self.expect(Token::LParen, true);
+            while !self.is(Token::RParen) {
+                node.children.push(self.expr());
+                if !self.is(Token::RParen) {
+                    self.expect(Token::Comma, true);
+                }
+            }
+            self.expect(Token::RParen, true);
         }
-        self.expect(Token::RParen);
         Box::new(node)
     }
 
     fn factor(&mut self) -> Box<ASTNode> {
         if self.is(Token::Identifier(String::new())) && self.n == Token::LParen {
-            self.function_call()
-        } else if self.is(Token::Identifier(String::new())) || self.is(Token::Int(0)) || self.is(Token::Float(0.0)) || self.is(Token::Null) || self.is(Token::False) || self.is(Token::True) {
+            self.function_call(false)
+        } else
+            if self.is(Token::Identifier(String::new())) || self.is(Token::Int(0)) || self.is(Token::Float(0.0)) || self.is(Token::Null) || self.is(Token::False) || self.is(Token::True) || self.is(Token::String(String::new())) {
             let ret = Box::new(ASTNode::from_token(self.c.clone()));
-            self.next();
+            self.next(true);
             ret
-        } else if self.accept(Token::LParen) {
+        } else if self.accept(Token::LParen, true) {
             let ret = self.math_expr();
-            self.expect(Token::RParen);
+            self.expect(Token::RParen, true);
             ret
-        } else if self.accept(Token::FloorStart) {
+        } else if self.accept(Token::FloorStart, true) {
             let mut node = ASTNode::from(ASTNodeValue::Floor);
             node.children.push(self.math_expr());
-            self.expect(Token::FloorEnd);
+            self.expect(Token::FloorEnd, true);
             Box::new(node)
         } else {
             self.errors.push(format!("Illegal token: {}", self.c));
-            self.next();
+            self.next(true);
             Box::new(ASTNode::from_token(Token::Illegal))
         }
     }
@@ -296,7 +316,7 @@ impl Parser {
     fn term(&mut self) -> Box<ASTNode> {
         let mut node: Box<ASTNode>;
         if self.is(Token::Subtract) || self.is(Token::Not) {
-            node = Box::new(ASTNode::from_token(self.next_prev()));
+            node = Box::new(ASTNode::from_token(self.next_prev(true)));
             node.children.push(self.term());
             return node;
         } else {
@@ -304,7 +324,7 @@ impl Parser {
         }
 
         while matches!(self.c, Token::Multiply | Token::Divide | Token::Mod) {
-            let mut new = ASTNode::from_token(self.next_prev());
+            let mut new = ASTNode::from_token(self.next_prev(true));
             let right = self.factor();
             if right.value == ASTNodeValue::Illegal {
                 self.errors.push(String::from("Missing expression"));
@@ -321,7 +341,7 @@ impl Parser {
     fn math_expr(&mut self) -> Box<ASTNode> {
         let mut node = self.term();
         while matches!(self.c, Token::Add | Token::Subtract) {
-            let mut new = ASTNode::from_token(self.next_prev());
+            let mut new = ASTNode::from_token(self.next_prev(true));
             let right = self.math_expr();
             if right.value == ASTNodeValue::Illegal {
                 self.errors.push(String::from("Missing expression"));
@@ -344,7 +364,7 @@ impl Parser {
                 Token::GreaterThan |
                 Token::LessThanEqual |
                 Token::GreaterThanEqual) {
-            let mut new = ASTNode::from_token(self.next_prev());
+            let mut new = ASTNode::from_token(self.next_prev(true));
             let right = self.logical_expr();
             if right.value == ASTNodeValue::Illegal {
                 self.errors.push(String::from("Missing expression"));
@@ -362,7 +382,7 @@ impl Parser {
     }
 
     fn pif(&mut self) -> Box<ASTNode> {
-        self.expect(Token::If);
+        self.expect(Token::If, true);
         let mut node = ASTNode::from_token(Token::If);
 
         let expr = self.expr();
@@ -372,11 +392,11 @@ impl Parser {
         }
 
         node.children.push(expr);
-        self.expect(Token::Then);
+        self.expect(Token::Then, true);
 
         node.children.push(self.prog(true, true, false));
 
-        if self.accept(Token::Else) {
+        if self.accept(Token::Else, true) {
             node.children.push(self.prog(true, false, false));
         }
 
@@ -384,7 +404,7 @@ impl Parser {
     }
 
     fn pforheader(&mut self) -> Box<ASTNode> {
-        self.expect(Token::For);
+        self.expect(Token::For, true);
         let mut node = ASTNode::from_token(Token::For);
         if !self.is(Token::Identifier(String::new())) && self.n != Token::Set {
             self.errors.push(String::from("Expected var def"));
@@ -392,32 +412,32 @@ impl Parser {
         }
         let set = self.set();
         node.children.push(set);
-        if !self.expect(Token::Comma) {
+        if !self.expect(Token::Comma, false) {
             return Box::new(ASTNode::from_token(Token::Illegal));
         }
         node.children.push(self.expr());
-        if self.accept(Token::Comma) {
+        if self.accept(Token::Comma, false) {
             node.children.push(self.expr());
         }
         Box::new(node)
     }
 
     fn pwhileheader(&mut self) -> Box<ASTNode> {
-        self.expect(Token::While);
+        self.expect(Token::While, true);
         let mut node = ASTNode::from_token(Token::While);
         node.children.push(self.stmt());
         Box::new(node)
     }
 
     fn puntilheader(&mut self) -> Box<ASTNode> {
-        self.expect(Token::Until);
+        self.expect(Token::Until, true);
         let mut node = ASTNode::from_token(Token::Until);
         node.children.push(self.stmt());
         Box::new(node)
     }
 
     fn execute(&mut self) -> Box<ASTNode> {
-        self.expect(Token::Execute);
+        self.expect(Token::Execute, true);
         let mut node = ASTNode::from_token(Token::Execute);
         node.children.push(self.prog(true, false, true));
         if self.is(Token::While) {
@@ -432,28 +452,28 @@ impl Parser {
 
     fn pfor(&mut self) -> Box<ASTNode> {
         let mut node = self.pforheader();
-        self.expect(Token::Execute);
+        self.expect(Token::Execute, true);
         node.children.push(self.prog(true, false, false));
         node
     }
 
     fn pwhile(&mut self) -> Box<ASTNode> {
         let mut node = self.pwhileheader();
-        self.expect(Token::Execute);
+        self.expect(Token::Execute, true);
         node.children.push(self.prog(true, false, false));
         node
     }
 
     fn until(&mut self) -> Box<ASTNode> {
         let mut node = self.puntilheader();
-        self.expect(Token::Execute);
+        self.expect(Token::Execute, true);
         node.children.push(self.prog(true, false, false));
         node
     }
 
     fn set(&mut self) -> Box<ASTNode> {
-        let identifier = ASTNode::from_token(self.next_prev());
-        self.expect(Token::Set);
+        let identifier = ASTNode::from_token(self.next_prev(true));
+        self.expect(Token::Set, false);
         let mut node = ASTNode::from(ASTNodeValue::Set);
         node.children.push(Box::new(identifier));
         node.children.push(self.expr());
@@ -481,13 +501,17 @@ impl Parser {
     fn prog(&mut self, in_block: bool, in_if: bool, in_execute: bool) -> Box<ASTNode> {
         let mut prog = Box::new(ASTNode::from(ASTNodeValue::Program));
         while self.c != Token::EOF && !(in_if && self.is(Token::Else)) && !(matches!(self.c, Token::While | Token::For | Token::Until) && in_execute) {
-            let stmt = self.stmt();
+            let stmt = if self.is(Token::Identifier(String::new())) && self.n != Token::Set && self.n != Token::LParen {
+                self.function_call(true)
+            } else {
+                self.stmt()
+            };
 
             if stmt.value != ASTNodeValue::Illegal {
                 prog.children.push(stmt);
             }
             if in_block && self.is(Token::BlockEnd) {
-                self.next();
+                self.next(true);
                 break;
             }
         }

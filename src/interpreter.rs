@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Display, cell::RefCell, rc::Rc};
+use std::{collections::HashMap, fmt::Display, cell::RefCell, rc::Rc, io::Write};
 use anyhow::{Result, anyhow};
 
 use crate::parser::{ASTNode, ASTNodeValue};
@@ -8,16 +8,21 @@ pub enum Object {
     Int(i64),
     Float(f64),
     Bool(bool),
+    String(String),
     Null,
 }
 
 impl Display for Object {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Object::Int(x) => write!(f, "Int({})", x),
-            Object::Float(x) => write!(f, "Float({})", x),
-            Object::Bool(x) => write!(f, "Bool({})", x),
+            Object::Int(x) => write!(f, "{}", x),
+            Object::Float(x) => write!(f, "{}", x),
+            Object::Bool(x) => write!(f, "{}", match x {
+                true => "adevărat",
+                false => "fals",
+            }),
             Object::Null => write!(f, "Nul"),
+            Object::String(x) => write!(f, "{}", x),
         }
     }
 }
@@ -68,6 +73,7 @@ macro_rules! perform_operation {
                         true => 1.0,
                         false => 0.0,
                     }),
+                    Object::String(_) => Object::Null,
                     Object::Null => left,
                 },
                 Object::Int(leftv) => match right {
@@ -77,6 +83,7 @@ macro_rules! perform_operation {
                         true => 1,
                         false => 0,
                     }),
+                    Object::String(_) => Object::Null,
                     Object::Null => left,
                 },
                 Object::Bool(leftv) => match right {
@@ -95,7 +102,18 @@ macro_rules! perform_operation {
                         true => 1,
                         false => 0,
                     }),
+                    Object::String(_) => Object::Null,
                     Object::Null => left,
+                },
+                Object::String(leftv) => match right {
+                    Object::Int(right) => Object::String(leftv + &right.to_string()),
+                    Object::Float(right) => Object::String(leftv + &right.to_string()),
+                    Object::Bool(right) => Object::String(leftv + match right {
+                        true => "adevărat",
+                        false => "fals",
+                    }),
+                    Object::String(right) => Object::String(leftv + &right.to_string()),
+                    Object::Null => Object::String(leftv + "Nul"),
                 },
                 Object::Null => left,
             };
@@ -127,6 +145,7 @@ macro_rules! perform_operation_term {
                         true => 1.0,
                         false => 0.0,
                     }),
+                    Object::String(_) => Object::Null,
                     Object::Null => left,
                 },
                 Object::Int(leftv) => match right {
@@ -136,6 +155,7 @@ macro_rules! perform_operation_term {
                         true => 1,
                         false => 0,
                     }),
+                    Object::String(_) => Object::Null,
                     Object::Null => left,
                 },
                 Object::Bool(leftv) => match right {
@@ -154,8 +174,10 @@ macro_rules! perform_operation_term {
                         true => 1,
                         false => 0,
                     }),
+                    Object::String(_) => Object::Null,
                     Object::Null => left,
                 },
+                Object::String(_) => Object::Null,
                 Object::Null => left,
             };
             Ok(ret)
@@ -169,7 +191,12 @@ pub fn truthy(obj: Object) -> bool {
         Object::Int(x) => x != 0,
         Object::Bool(x) => x,
         Object::Float(x) => x != 0.0,
+        Object::String(_) => true,
     }
+}
+
+fn reverse(s: String) -> String {
+    s.chars().rev().collect()
 }
 
 pub fn eval<'a>(root: Box<ASTNode>, parent: Option<Rc<RefCell<Environment>>>) -> Result<Object> {
@@ -178,6 +205,7 @@ pub fn eval<'a>(root: Box<ASTNode>, parent: Option<Rc<RefCell<Environment>>>) ->
         ASTNodeValue::Int(x) => Ok(Object::Int(x)),
         ASTNodeValue::Float(x) => Ok(Object::Float(x)),
         ASTNodeValue::Bool(x) => Ok(Object::Bool(x)),
+        ASTNodeValue::String(x) => Ok(Object::String(x)),
         ASTNodeValue::Null => Ok(Object::Null),
         ASTNodeValue::Identifier(x) => {
             match &envb.borrow_mut().find_variable(x.as_str(), None) {
@@ -287,6 +315,7 @@ pub fn eval<'a>(root: Box<ASTNode>, parent: Option<Rc<RefCell<Environment>>>) ->
                     Object::Int(x) => Ok(Object::Int(-x)),
                     Object::Float(x) => Ok(Object::Float(-x)),
                     Object::Bool(x) => Ok(Object::Bool(!x)),
+                    Object::String(x) => Ok(Object::String(reverse(x))),
                     Object::Null => Ok(Object::Null),
                 }
             } else {
@@ -295,7 +324,11 @@ pub fn eval<'a>(root: Box<ASTNode>, parent: Option<Rc<RefCell<Environment>>>) ->
         }
         ASTNodeValue::Multiply => perform_operation_term!(root.children[0], root.children[1], envb.clone(), *),
         ASTNodeValue::Divide => {
-            if root.children[1].value == ASTNodeValue::Null {
+            if let ASTNodeValue::String(_) = root.children[0].value {
+                Err(anyhow!("You cannot divide a string."))
+            } else if let ASTNodeValue::String(_) = root.children[1].value {
+                Err(anyhow!("You cannot divide with a string."))
+            } else if root.children[1].value == ASTNodeValue::Null {
                 Err(anyhow!("Division by zero is illegal."))
             } else {
                 perform_operation_term!(root.children[0], root.children[1], envb.clone(), /)
@@ -314,6 +347,7 @@ pub fn eval<'a>(root: Box<ASTNode>, parent: Option<Rc<RefCell<Environment>>>) ->
                 Object::Int(x) => Ok(Object::Int(x)),
                 Object::Float(x) => Ok(Object::Int(x.floor() as i64)),
                 Object::Bool(_) => Err(anyhow!("Nu poti rotunji în jos un bool.")),
+                Object::String(_) => Err(anyhow!("Nu poti rotunji în jos un șir de caractere.")),
                 Object::Null => Ok(Object::Null),
             }
         }
@@ -323,6 +357,7 @@ pub fn eval<'a>(root: Box<ASTNode>, parent: Option<Rc<RefCell<Environment>>>) ->
                 Object::Bool(x) => Object::Bool(!x),
                 Object::Float(_) => Object::Bool(false),
                 Object::Int(_) => Object::Bool(false),
+                Object::String(_) => Object::Bool(false),
             })
         }
         ASTNodeValue::And => {
@@ -331,7 +366,16 @@ pub fn eval<'a>(root: Box<ASTNode>, parent: Option<Rc<RefCell<Environment>>>) ->
         ASTNodeValue::Or => {
             Ok(Object::Bool(truthy(eval(root.children[0].clone(), Some(envb.clone()))?) || truthy(eval(root.children[0].clone(), Some(envb.clone()))?)))
         }
-        ASTNodeValue::FunctionCall(_) | ASTNodeValue::Illegal => {
+        ASTNodeValue::FunctionCall(name) => {
+            if name == "scrie" {
+                for node in root.children {
+                    print!("{}", eval(node.clone(), Some(envb.clone()))?);
+                    std::io::stdout().flush()?;
+                }
+            }
+            Ok(Object::Null)
+        },
+        ASTNodeValue::Illegal => {
             todo!("Unimplemented: {}", root.value)
         }
     }

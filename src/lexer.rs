@@ -8,11 +8,13 @@ pub enum Token {
     Identifier(String),
     Int(i64),
     Float(f64),
+    String(String),
     True,
     False,
     Null,
 
     Comma,
+    SColon,
 
     If,
     Then,
@@ -59,10 +61,12 @@ impl Clone for Token {
             Token::Identifier(x) => Token::Identifier(x.clone()),
             Token::Int(x) => Token::Int(x.clone()),
             Token::Float(x) => Token::Float(x.clone()),
+            Token::String(x) => Token::String(x.clone()),
             Token::True => Token::True,
             Token::False => Token::False,
             Token::Null => Token::Null,
             Token::Comma => Token::Comma,
+            Token::SColon => Token::SColon,
             Token::If => Token::If,
             Token::Then => Token::Then,
             Token::Else => Token::Else,
@@ -110,11 +114,13 @@ impl Display for Token {
             Token::Identifier(x) => write!(f, "Identifier({})", x),
             Token::Int(x) => write!(f, "Int({})", x),
             Token::Float(x) => write!(f, "Float({})", x),
+            Token::String(x) => write!(f, "String({})", x),
             Token::True => write!(f, "True"),
             Token::False => write!(f, "False"),
             Token::Null => write!(f, "Null"),
 
             Token::Comma => write!(f, "Comma"),
+            Token::SColon => write!(f, "SColon"),
 
             Token::If => write!(f, "If"),
             Token::Then => write!(f, "Then"),
@@ -184,6 +190,8 @@ impl Lexer {
         let mut should_skip = true;
 
         let tok = match self.ch {
+            '"' => Token::String(self.read_string('"')),
+            '\'' => Token::String(self.read_string('\'')),
             ',' => Token::Comma,
             '+' => Token::Add,
             '-' => Token::Subtract,
@@ -192,6 +200,7 @@ impl Lexer {
             '%' => Token::Mod,
             '=' => Token::Equal,
             '≠' => Token::NotEqual,
+            ';' | '\n' => Token::SColon,
             '!' => {
                 if self.peek() == '=' {
                     self.read_char();
@@ -339,8 +348,23 @@ impl Lexer {
         lol
     }
 
+    fn read_string(&mut self, ch: char) -> String {
+        let position = self.pos + 1;
+        loop {
+            self.read_char();
+            if self.ch == '\\' && self.ch == ch {
+                self.read_char();
+                self.read_char();
+            }
+            if self.ch == ch || self.ch == '\0' {
+                break;
+            }
+        }
+        return self.input.chars().skip(position).take(self.pos - position).collect::<String>().replace("\\n", "\n").replace("\\r", "\r");
+    }
+
     fn skip_whitespace(&mut self) {
-        while self.ch.is_whitespace() || matches!(self.ch, '│' | '└' | '┌' | ';') {
+        while (self.ch.is_whitespace() && self.ch != '\n') || matches!(self.ch, '│' | '└' | '┌') {
             self.read_char();
         }
     }

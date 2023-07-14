@@ -1,12 +1,15 @@
 use std::fs::read_to_string;
 use std::{path::Path, rc::Rc, cell::RefCell};
 use std::env;
+use crossterm::cursor;
 use home::home_dir;
 use interpreter::{Environment, eval};
 use rustyline::{Editor, history::DefaultHistory, validate::Validator, hint::{Hinter, HistoryHinter}, Context, highlight::Highlighter, Helper, completion::{Completer, Pair}, error::ReadlineError, config::Configurer};
 
 use lexer::Lexer;
 use parser::Parser;
+
+use crate::interpreter::Object;
 
 mod lexer;
 mod parser;
@@ -62,8 +65,7 @@ fn main() {
         let mut parser = Parser::new(lex);
         let root = parser.parse();
         root.print(String::new(), true);
-
-        println!("Rezultat: {}", eval(root, Some(Rc::clone(&envb))).unwrap());
+        eval(root, Some(Rc::clone(&envb))).unwrap();
         return;
     }
 
@@ -105,7 +107,19 @@ fn main() {
             continue;
         }
 
-        println!("Rezultat: {}", eval(root, Some(Rc::clone(&envb))).unwrap());
+        let res = eval(root, Some(Rc::clone(&envb)));
+        match cursor::position() {
+            Ok((x, _)) => if x != 0 {
+                println!("\x1b[7m%\x1b[0m");
+            },
+            Err(_) => ()
+        };
+        match res {
+            Err(e) => println!("Eroare ROLang: {}", e),
+            Ok(res) => if res != Object::Null {
+                println!("Rezultat: {}", res);
+            }
+        }
     }
 
     rl.save_history(rl_hist).unwrap();
