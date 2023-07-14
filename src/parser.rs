@@ -523,6 +523,10 @@ impl Parser {
                 self.stmt()
             };
 
+            while self.is(Token::SColon) {
+                self.next(false)
+            }
+
             if stmt.value != ASTNodeValue::Illegal {
                 prog.children.push(stmt);
             }

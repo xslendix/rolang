@@ -214,8 +214,8 @@ fn reverse(s: String) -> String {
     s.chars().rev().collect()
 }
 
-pub fn eval<'a>(root: Box<ASTNode>, parent: Option<Rc<RefCell<Environment>>>) -> Result<Object> {
-    let envb = parent.clone().unwrap();
+pub fn eval(root: Box<ASTNode>, parent: Option<Rc<RefCell<Environment>>>) -> Result<Object> {
+    let envb = parent.unwrap();
     match root.value {
         ASTNodeValue::Int(x) => Ok(Object::Int(x)),
         ASTNodeValue::Float(x) => Ok(Object::Float(x)),
