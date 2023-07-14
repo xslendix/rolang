@@ -86,13 +86,15 @@ fn main() {
         if readline.is_err() {
             break;
         }
-        let input = readline.unwrap();
+        let mut input = readline.unwrap();
 
         if input.trim().is_empty() {
             continue;
         }
 
         rl.add_history_entry(input.clone()).unwrap();
+
+        input.push('\n');
 
         let lex = Lexer::new(input);
         let mut parser = Parser::new(lex);
