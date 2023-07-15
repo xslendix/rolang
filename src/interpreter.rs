@@ -274,7 +274,11 @@ pub fn eval(root: Box<ASTNode>, parent: Option<Rc<RefCell<Environment>>>) -> Res
             let mut loopy = root.children[1].clone();
             loopy.children.push(root.children[0].clone());
             let val_loopy = eval(loopy, Some(envb.clone()));
-            ret = val_loopy;
+            if let Ok(v) = val_loopy {
+                ret = Ok(v);
+            } else if let Err(e) = val_loopy {
+                ret = Err(e);
+            }
             ret
         }
         ASTNodeValue::For => {

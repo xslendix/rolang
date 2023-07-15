@@ -258,8 +258,6 @@ impl Lexer {
                     _ => ()
                 }
 
-                should_skip = false;
-
                 return Ok(match ident.as_ref() {
                     "nul" => Token::Null,
                     "adevărat" => Token::True,
