@@ -1,15 +1,30 @@
-use std::{collections::HashMap, fmt::Display, cell::RefCell, rc::Rc, io::Write};
+use std::{collections::HashMap, fmt::Display, cell::RefCell, rc::Rc, io::Write, cmp::Ordering};
 use anyhow::{Result, anyhow};
 
 use crate::parser::{ASTNode, ASTNodeValue};
 
-#[derive(Clone, PartialEq, PartialOrd)]
+#[derive(Clone, PartialEq)]
 pub enum Object {
     Int(i64),
     Float(f64),
     Bool(bool),
     String(String),
     Null,
+}
+
+impl PartialOrd for Object {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        match (self, other) {
+            (Object::Int(a), Object::Int(b)) => a.partial_cmp(b),
+            (Object::Float(a), Object::Float(b)) => a.partial_cmp(b),
+            (Object::Int(a), Object::Float(b)) => (*a as f64).partial_cmp(b),
+            (Object::Float(a), Object::Int(b)) => a.partial_cmp(&(*b as f64)),
+            (Object::Bool(a), Object::Bool(b)) => a.partial_cmp(b),
+            (Object::String(a), Object::String(b)) => a.partial_cmp(b),
+            (Object::Null, Object::Null) => Some(Ordering::Equal),
+            _ => None,
+        }
+    }
 }
 
 impl Display for Object {
@@ -131,8 +146,8 @@ macro_rules! perform_operation {
 macro_rules! perform_logical_operation {
     ($left:expr, $right:expr, $env:expr, $operator:tt) => {
         {
-            let left = (eval($left.clone(), Some($env))?);
-            let right = (eval($right.clone(), Some($env))?);
+            let left = eval($left.clone(), Some($env))?;
+            let right = eval($right.clone(), Some($env))?;
             Ok(Object::Bool(left $operator right))
         }
     };

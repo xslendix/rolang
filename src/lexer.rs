@@ -360,7 +360,7 @@ impl Lexer {
                 break;
             }
         }
-        return self.input.chars().skip(position).take(self.pos - position).collect::<String>().replace("\\n", "\n").replace("\\r", "\r");
+        return self.input.chars().skip(position).take(self.pos - position).collect::<String>().replace("\\n", "\n").replace("\\r", "\r").replace("\\t", "\t").replace("\\e", "\x1b");
     }
 
     fn skip_whitespace(&mut self) {

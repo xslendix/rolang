@@ -1,0 +1,13 @@
+i<-0
+
+cât timp i <= 10 execută
+	dacă i % 2 = 0 atunci
+		scrie 'LOL'
+		i <- i + 1
+	altfel
+		scrie 'lol'
+	[]
+	scrie i, '\n'
+	i <- i + 1
+[]
+
