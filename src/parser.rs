@@ -266,7 +266,7 @@ impl Parser {
         if self.accept(ttype.clone(), skip_scolon) {
             return true;
         }
-        self.errors.push(format!("Expected {}, got {}", ttype, self.c).to_string());
+        self.errors.push(format!("Se aștepta {}, s-a primit {}", ttype, self.c).to_string());
         false
     }
 
@@ -394,7 +394,7 @@ impl Parser {
 
         let expr = self.expr();
         if expr.value == ASTNodeValue::Illegal {
-            self.errors.push(String::from("Expected condition"));
+            self.errors.push(String::from("Se aștepta o condiție"));
             return Box::new(ASTNode::from_token(Token::Illegal));
         }
 
@@ -414,7 +414,7 @@ impl Parser {
         self.expect(Token::For, true);
         let mut node = ASTNode::from_token(Token::For);
         if !self.is(Token::Identifier(String::new())) && self.n != Token::Set {
-            self.errors.push(String::from("Expected var def"));
+            self.errors.push(String::from("Se aștepta o declarație de variabilă."));
             return Box::new(ASTNode::from_token(Token::Illegal));
         }
         let set = self.set();

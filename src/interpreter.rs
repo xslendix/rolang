@@ -358,19 +358,23 @@ pub fn eval(root: Box<ASTNode>, parent: Option<Rc<RefCell<Environment>>>) -> Res
         }
         ASTNodeValue::Multiply => perform_operation_term!(root.children[0], root.children[1], envb.clone(), *),
         ASTNodeValue::Divide => {
-            if let ASTNodeValue::String(_) = root.children[0].value {
-                Err(anyhow!("You cannot divide a string."))
+            if let ASTNodeValue::String(s) = &root.children[0].value {
+                Ok(Object::String(s.chars().take(s.chars().count()/match eval(root.children[1].clone(), Some(envb.clone()))? {
+                    Object::Int(x) => x as usize,
+                    Object::Float(x) => x as usize,
+                    _ => return Err(anyhow!("Nu poți împărți un șir de caractere așa.")),
+                }).collect()))
             } else if let ASTNodeValue::String(_) = root.children[1].value {
-                Err(anyhow!("You cannot divide with a string."))
+                Err(anyhow!("Nu poți împărți la un șir de caracteretring."))
             } else if root.children[1].value == ASTNodeValue::Null {
-                Err(anyhow!("Division by zero is illegal."))
+                Err(anyhow!("Împărțirea la zero este ilegală."))
             } else {
                 perform_operation_term!(root.children[0], root.children[1], envb.clone(), /)
             }
         }
         ASTNodeValue::Mod => {
             if root.children[1].value == ASTNodeValue::Null {
-                Err(anyhow!("Modulo by zero is illegal."))
+                Err(anyhow!("Modul la zero este ilegal."))
             } else {
                 perform_operation!(root.children[0], root.children[1], envb.clone(), %)
             }
@@ -419,7 +423,7 @@ pub fn eval(root: Box<ASTNode>, parent: Option<Rc<RefCell<Environment>>>) -> Res
                 }
                 Some(x) => {
                     if root.children.len() > 0 {
-                        unimplemented!("Nu sunt implementate funcțiile user-defined.")
+                        unimplemented!("Funcțiile user-defined sunt neimplementate.")
                     } else {
                         Ok(*x.clone())
                     }
@@ -427,7 +431,7 @@ pub fn eval(root: Box<ASTNode>, parent: Option<Rc<RefCell<Environment>>>) -> Res
             }
         },
         ASTNodeValue::Illegal => {
-            todo!("Unimplemented: {}", root.value)
+            todo!("Neimplementat: {}", root.value)
         }
     }
 }

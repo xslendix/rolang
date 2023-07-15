@@ -80,6 +80,15 @@ fn main() {
         let mut parser = Parser::new(lex);
         let root = parser.parse();
         //root.print(String::new(), true);
+
+        if parser.errors.len() > 0 {
+            println!("Erori găsite:");
+            for (pos, msg) in parser.errors.iter().enumerate() {
+                println!(" {}: {}", pos+1, msg);
+            }
+            return;
+        }
+
         eval(root, Some(Rc::clone(&envb))).unwrap();
         return;
     }
@@ -90,7 +99,7 @@ fn main() {
 
     let mut rl = CustomEditor::new().unwrap();
     if rl.load_history(rl_hist).is_err() {
-        println!("New history file created.");
+        println!("Istoric nou creat.");
     }
 
     rl.set_helper(Some(CustomHelper { hinter: HistoryHinter {  }}));
@@ -117,7 +126,7 @@ fn main() {
         //root.print(String::new(), true);
 
         if parser.errors.len() > 0 {
-            println!("Errors found:");
+            println!("Erori găsite:");
             for (pos, msg) in parser.errors.iter().enumerate() {
                 println!(" {}: {}", pos+1, msg);
             }
