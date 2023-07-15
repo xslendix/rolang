@@ -1,4 +1,6 @@
 use std::fs::read_to_string;
+use std::io::Write;
+use std::process::exit;
 use std::{path::Path, rc::Rc, cell::RefCell};
 use std::env;
 use crossterm::cursor;
@@ -58,7 +60,16 @@ fn main() {
 
     let args: Vec<_> = env::args().collect();
     if args.len() > 1 {
-        let file = args[1].clone();
+        let mut filep = args[1].clone();
+        let mut file = Path::new(&filep);
+        if !file.exists() {
+            filep.push_str(".ro");
+            file = Path::new(&filep);
+            if !file.exists() {
+                std::io::stderr().write(format!("Nu există fișierul `{}`!\n", filep).as_bytes()).unwrap();
+                exit(1);
+            }
+        }
         let input = read_to_string(file).unwrap();
 
         let lex = Lexer::new(input);
