@@ -36,10 +36,14 @@ impl Completer for CustomHelper {
         let word = &line[word_start..pos];
 
         if !word.is_empty() {
-            completions.push(Pair {
-                display: "dacă".to_string(),
-                replacement: "dacă".to_string(),
-            });
+            for i in vec!["dacă", "până când", "pânăcând", "cât timp", "câttimp", "atunci", "altfel", "pentru", "execută", "scrie", "citește"] {
+                if i.starts_with(word) {
+                    completions.push(Pair {
+                        display: i.to_string(),
+                        replacement: i.to_string(),
+                    });
+                }
+            }
         }
 
         Ok((word_start, completions))
