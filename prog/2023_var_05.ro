@@ -1,4 +1,4 @@
-x<-6907512
+citește x (număr natural)
 p<-1; m←-1
 ┌cât timp p≤x execută
 │ c<-[x/p]%10

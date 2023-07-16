@@ -292,6 +292,7 @@ impl Lexer {
                     "panacand" | "pânacand" | "pânăcand" | "panăcând" | "panacând" | "pânacând" | "panăcand" => { return Err(anyhow!("Folosește diacitice, este `pânăcand`, nu `panacand`!")); },
                     "cat timp" => { return Err(anyhow!("Folosește diacitice, este `cât timp`, nu `cat timp`!")); },
                     "pana cand" | "pâna cand" | "până cand" | "pană când" | "pana când" | "pâna când" | "pană cand" => { return Err(anyhow!("Folosește diacitice, este `până cand`, nu `pana cand`!")); },
+                    "citeste" => { return Err(anyhow!("Folosește diacitice, este `citește`, nu `citeste`!")); },
                     _ => ()
                 }
 
