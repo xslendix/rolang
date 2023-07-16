@@ -1,4 +1,5 @@
-use std::{collections::HashMap, fmt::Display, cell::RefCell, rc::Rc, io::Write, cmp::Ordering};
+use std::{collections::HashMap, fmt::Display, cell::RefCell, rc::Rc, io::{Write, stdin, BufRead}, cmp::Ordering};
+use text_io::read;
 use anyhow::{Result, anyhow};
 
 use crate::parser::{ASTNode, ASTNodeValue};
@@ -10,6 +11,9 @@ pub enum Object {
     Bool(bool),
     String(String),
     Null,
+    CastUnsignedRef(String),
+    CastFloatRef(String),
+    CastRef(String),
 }
 
 impl PartialOrd for Object {
@@ -38,6 +42,9 @@ impl Display for Object {
             }),
             Object::Null => write!(f, "nul"),
             Object::String(x) => write!(f, "{}", x),
+            Object::CastUnsignedRef(x) => write!(f, "RefNat({})", x),
+            Object::CastFloatRef(x) => write!(f, "RefFloat({})", x),
+            Object::CastRef(x) => write!(f, "Ref({})", x),
         }
     }
 }
@@ -93,6 +100,7 @@ macro_rules! perform_operation {
                     }),
                     Object::String(x) => Object::String(leftv.to_string() + x.as_str()),
                     Object::Null => left,
+                    _ => unimplemented!(),
                 },
                 Object::Int(leftv) => match right {
                     Object::Int(right) => Object::Int(leftv $operator right),
@@ -103,6 +111,7 @@ macro_rules! perform_operation {
                     }),
                     Object::String(x) => Object::String(leftv.to_string() + x.as_str()),
                     Object::Null => left,
+                    _ => unimplemented!(),
                 },
                 Object::Bool(leftv) => match right {
                     Object::Int(right) => Object::Int(match leftv {
@@ -125,6 +134,7 @@ macro_rules! perform_operation {
                         false => String::from("fals"),
                     } + x.as_str()),
                     Object::Null => left,
+                    _ => unimplemented!(),
                 },
                 Object::String(leftv) => match right {
                     Object::Int(right) => Object::String(leftv + &right.to_string()),
@@ -135,8 +145,10 @@ macro_rules! perform_operation {
                     }),
                     Object::String(right) => Object::String(leftv + &right.to_string()),
                     Object::Null => Object::String(leftv + "nul"),
+                    _ => unimplemented!(),
                 },
                 Object::Null => left,
+                _ => unimplemented!(),
             };
             Ok(ret)
         }
@@ -168,6 +180,7 @@ macro_rules! perform_operation_term {
                     }),
                     Object::String(_) => Object::Null,
                     Object::Null => left,
+                    _ => unimplemented!(),
                 },
                 Object::Int(leftv) => match right {
                     Object::Int(right) => Object::Float(leftv as f64 $operator right as f64),
@@ -178,6 +191,7 @@ macro_rules! perform_operation_term {
                     }),
                     Object::String(_) => Object::Null,
                     Object::Null => left,
+                    _ => unimplemented!(),
                 },
                 Object::Bool(leftv) => match right {
                     Object::Int(right) => Object::Int(match leftv {
@@ -197,6 +211,7 @@ macro_rules! perform_operation_term {
                     }),
                     Object::String(_) => Object::Null,
                     Object::Null => left,
+                    _ => unimplemented!(),
                 },
                 Object::String(x) => Object::String(x.repeat(match right {
                     Object::Int(j) => j as usize,
@@ -207,8 +222,10 @@ macro_rules! perform_operation_term {
                     },
                     Object::String(_) => 0,
                     Object::Null => 0,
+                    _ => unimplemented!(),
                 })),
                 Object::Null => left,
+                _ => unimplemented!(),
             };
             Ok(ret)
         }
@@ -222,6 +239,7 @@ pub fn truthy(obj: Object) -> bool {
         Object::Bool(x) => x,
         Object::Float(x) => x != 0.0,
         Object::String(_) => true,
+        _ => true,
     }
 }
 
@@ -351,6 +369,7 @@ pub fn eval(root: Box<ASTNode>, parent: Option<Rc<RefCell<Environment>>>) -> Res
                     Object::Bool(x) => Ok(Object::Bool(!x)),
                     Object::String(x) => Ok(Object::String(reverse(x))),
                     Object::Null => Ok(Object::Null),
+                    _ => unimplemented!(),
                 }
             } else {
                 perform_operation!(root.children[0], root.children[1], envb.clone(), -)
@@ -387,6 +406,7 @@ pub fn eval(root: Box<ASTNode>, parent: Option<Rc<RefCell<Environment>>>) -> Res
                 Object::Bool(_) => Err(anyhow!("Nu poti rotunji în jos un bool.")),
                 Object::String(_) => Err(anyhow!("Nu poti rotunji în jos un șir de caractere.")),
                 Object::Null => Ok(Object::Null),
+                _ => unimplemented!(),
             }
         }
         ASTNodeValue::Not => {
@@ -396,6 +416,7 @@ pub fn eval(root: Box<ASTNode>, parent: Option<Rc<RefCell<Environment>>>) -> Res
                 Object::Float(_) => Object::Bool(false),
                 Object::Int(_) => Object::Bool(false),
                 Object::String(_) => Object::Bool(false),
+                _ => unimplemented!(),
             })
         }
         ASTNodeValue::And => {
@@ -408,17 +429,43 @@ pub fn eval(root: Box<ASTNode>, parent: Option<Rc<RefCell<Environment>>>) -> Res
             let lol = &envb.borrow_mut().find_variable(name.as_str(), None);
             match lol {
                 None => {
-                    if name == "scrie" {
-                        let mut written = 0;
-                        for node in root.children {
-                            let res = eval(node.clone(), Some(envb.clone()))?;
-                            written += res.to_string().chars().count();
-                            print!("{}", res);
-                            std::io::stdout().flush()?;
+                    match name.as_str() {
+                        "scrie" => {
+                            let mut written = 0;
+                            for node in root.children {
+                                let res = eval(node.clone(), Some(envb.clone()))?;
+                                written += res.to_string().chars().count();
+                                print!("{}", res);
+                                std::io::stdout().flush()?;
+                            }
+                            Ok(Object::Int(written as i64))
                         }
-                        Ok(Object::Int(written as i64))
-                    } else {
-                        Ok(Object::Null)
+                        "citește" => {
+                            for node in root.children {
+                                match node.value {
+                                    ASTNodeValue::Identifier(x) => {
+                                        let mut v = String::new();
+                                        stdin().lock().read_line(&mut v)?;
+                                        envb.clone().borrow_mut().find_variable(&x, Some(Box::new(Object::String(v))));
+                                    }
+                                    ASTNodeValue::CastRef(x) => {
+                                        let v: i64 = read!("{}");
+                                        envb.clone().borrow_mut().find_variable(&x, Some(Box::new(Object::Int(v))));
+                                    }
+                                    ASTNodeValue::CastFloatRef(x) => {
+                                        let v: f64 = read!("{}");
+                                        envb.clone().borrow_mut().find_variable(&x, Some(Box::new(Object::Float(v))));
+                                    }
+                                    ASTNodeValue::CastUnsignedRef(x) => {
+                                        let v: u64 = read!("{}");
+                                        envb.clone().borrow_mut().find_variable(&x, Some(Box::new(Object::Int(v as i64))));
+                                    }
+                                    _ => return Err(anyhow!("Citirea formatată nu este implementată."))
+                                }
+                            }
+                            Ok(Object::Null)
+                        }
+                        _ => Err(anyhow!("Nu există funcția `{}`.", name))
                     }
                 }
                 Some(x) => {
@@ -432,6 +479,9 @@ pub fn eval(root: Box<ASTNode>, parent: Option<Rc<RefCell<Environment>>>) -> Res
         },
         ASTNodeValue::Illegal => {
             todo!("Neimplementat: {}", root.value)
-        }
+        },
+        ASTNodeValue::CastUnsignedRef(x) => Ok(Object::CastUnsignedRef(x)),
+        ASTNodeValue::CastFloatRef(x) => Ok(Object::CastFloatRef(x)),
+        ASTNodeValue::CastRef(x) => Ok(Object::CastRef(x)),
     }
 }

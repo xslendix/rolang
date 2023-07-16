@@ -13,6 +13,10 @@ pub enum ASTNodeValue {
     Null,
     Program,
 
+    CastUnsignedRef(String),
+    CastFloatRef(String),
+    CastRef(String),
+
     Set,
 
     If,
@@ -119,6 +123,10 @@ impl ASTNode {
             ASTNodeValue::Null => "Null".to_string(),
             ASTNodeValue::Program => "Program".to_string(),
 
+            ASTNodeValue::CastUnsignedRef(x) => format!("CastUnsignedRef \x1b[40G{}", x),
+            ASTNodeValue::CastFloatRef(x) => format!("CastFloatRef \x1b[40G{}", x),
+            ASTNodeValue::CastRef(x) => format!("CastRef \x1b[40G{}", x),
+
             ASTNodeValue::Set => "Set".to_string(),
 
             ASTNodeValue::If => "If".to_string(),
@@ -167,6 +175,10 @@ impl Display for ASTNodeValue {
             ASTNodeValue::Bool(x) => write!(f, "Bool({})", x),
             ASTNodeValue::Null => write!(f, "Null"),
             ASTNodeValue::Program => write!(f, "Program"),
+
+            ASTNodeValue::CastUnsignedRef(x) => write!(f, "CastUnsignedRef({})", x),
+            ASTNodeValue::CastFloatRef(x) => write!(f, "CastFloatRef({})", x),
+            ASTNodeValue::CastRef(x) => write!(f, "CastRef({})", x),
 
             ASTNodeValue::Set => write!(f, "Set"),
 
@@ -298,8 +310,17 @@ impl Parser {
     fn factor(&mut self) -> Box<ASTNode> {
         if self.is(Token::Identifier(String::new())) && self.n == Token::LParen {
             self.function_call(false)
-        } else
-            if self.is(Token::Identifier(String::new())) || self.is(Token::Int(0)) || self.is(Token::Float(0.0)) || self.is(Token::Null) || self.is(Token::False) || self.is(Token::True) || self.is(Token::String(String::new())) {
+        } else if let Token::Identifier(name) = &self.c && matches!(self.n, Token::CastUnsignedRef | Token::CastFloatRef | Token::CastRef) {
+            let ret = Box::new(match self.n {
+                Token::CastUnsignedRef => ASTNode::from(ASTNodeValue::CastUnsignedRef(name.to_string())),
+                Token::CastFloatRef => ASTNode::from(ASTNodeValue::CastFloatRef(name.to_string())),
+                Token::CastRef => ASTNode::from(ASTNodeValue::CastRef(name.to_string())),
+                _ => unreachable!(),
+            });
+            self.next(false);
+            self.next(false);
+            ret
+        } else if self.is(Token::Identifier(String::new())) || self.is(Token::Int(0)) || self.is(Token::Float(0.0)) || self.is(Token::Null) || self.is(Token::False) || self.is(Token::True) || self.is(Token::String(String::new())) {
             let ret = Box::new(ASTNode::from_token(self.c.clone()));
             self.next(true);
             ret

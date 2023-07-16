@@ -13,6 +13,10 @@ pub enum Token {
     False,
     Null,
 
+    CastUnsignedRef,
+    CastFloatRef,
+    CastRef,
+
     Comma,
     SColon,
 
@@ -65,6 +69,9 @@ impl Clone for Token {
             Token::True => Token::True,
             Token::False => Token::False,
             Token::Null => Token::Null,
+            Token::CastUnsignedRef => Token::CastUnsignedRef,
+            Token::CastFloatRef => Token::CastFloatRef,
+            Token::CastRef => Token::CastRef,
             Token::Comma => Token::Comma,
             Token::SColon => Token::SColon,
             Token::If => Token::If,
@@ -118,6 +125,10 @@ impl Display for Token {
             Token::True => write!(f, "True"),
             Token::False => write!(f, "False"),
             Token::Null => write!(f, "Null"),
+
+            Token::CastUnsignedRef => write!(f, "CastUnsignedRef"),
+            Token::CastFloatRef => write!(f, "CastFloatRef"),
+            Token::CastRef => write!(f, "CastRef"),
 
             Token::Comma => write!(f, "Comma"),
             Token::SColon => write!(f, "SColon"),
@@ -219,7 +230,33 @@ impl Lexer {
                 }
             }
             ']' => Token::FloorEnd,
-            '(' => Token::LParen,
+            '(' => {
+                let rest = self.input.chars().skip(self.pos).collect::<String>();
+                let rest = rest.trim();
+                if rest.starts_with("(număr natural)") {
+                    for _ in 1..15 {
+                        self.read_char()
+                    }
+                    Token::CastUnsignedRef
+                } else if rest.starts_with("(număr)") {
+                    for _ in 1..7 {
+                        self.read_char()
+                    }
+                    Token::CastFloatRef
+                } else if rest.starts_with("(număr real)") {
+                    for _ in 1..12 {
+                        self.read_char()
+                    }
+                    Token::CastFloatRef
+                } else if rest.starts_with("(ref)") {
+                    for _ in 1..5 {
+                        self.read_char()
+                    }
+                    Token::CastRef
+                } else {
+                    Token::LParen
+                }
+            },
             ')' => Token::RParen,
             '<' => {
                 if self.peek() == '-' {
@@ -330,7 +367,7 @@ impl Lexer {
                 let cand = self.read_ident();
                 if matches!(cand.as_str(), "cand" | "când") {
                     lol.push(' ');
-                    lol.push_str(cand.as_ref());
+                    lol.push_str(cand.as_str());
                 }
             }
             "cat" | "cât" => {
@@ -338,7 +375,7 @@ impl Lexer {
                 let timp = self.read_ident();
                 if timp == "timp" {
                     lol.push(' ');
-                    lol.push_str(timp.as_ref());
+                    lol.push_str(timp.as_str());
                 }
             }
             _ => ()
